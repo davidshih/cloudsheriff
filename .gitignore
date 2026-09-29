@@ -1,0 +1,26 @@
+# Terraform / OpenTofu
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+crash.log
+*.tfplan
+
+# Secrets
+.env
+.env.*
+!.env.example
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+
+# Scan output
+output/
+
+# Local status reports
+*_STATUS_UPDATE_*.html
+
+.DS_Store

@@ -1,0 +1,12 @@
+sandbox_account_id            = "111122223333"
+i_understand_this_is_insecure = true
+region                        = "us-east-1"
+
+# Your SSO role (the identity that will assume the audit role)
+auditor_principal_arn = "arn:aws:iam::111122223333:role/aws-reserved/sso.amazonaws.com/AWSReservedSSO_AdministratorAccess_abcdef"
+audit_external_id     = "change-me-to-a-random-string"
+
+enable_ec2             = true
+enable_kms             = true
+manage_password_policy = true
+enable_rds             = false
