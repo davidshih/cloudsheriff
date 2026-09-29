@@ -2,7 +2,7 @@
 
 A lab environment for demoing and testing CloudSheriff (read-only CIS drift monitor).
 
-> **Scope:** this repository is intentionally only the AWS test fixture. It creates known-good, known-bad, and manually driftable resources. The CloudSheriff core (normalizer, state/diff engine, SurrealDB persistence, Daytona scan-room orchestration, deterministic alert gate, and AI explanation pipeline) is deliberately **not** implemented here, so the core functionality can be built during the HackSprint.
+> **Scope:** this repository contains the AWS test fixture and the CloudSheriff pipeline in `cloudsheriff/`. See `HACKSPRINT_BOUNDARY.md` for what was built before and during the event.
 **Deploy it only in a dedicated sandbox AWS account.** Two guards prevent mistakes:
 
 1. The provider sets `allowed_account_ids`, so it refuses to run against any other account.
@@ -13,7 +13,7 @@ A lab environment for demoing and testing CloudSheriff (read-only CIS drift moni
 | Resource | State | Expected CIS 7.0 result | Role in the demo |
 |---|---|---|---|
 | `cs-demo-admin` SG | SSH only from `10.10.0.0/16` | **PASS** (baseline) | ★ Drift target: `drift.sh open` → REGRESSION |
-| `production-web-01` (t4g.nano, **stopped**) | IMDSv1, root volume unencrypted, attached to demo SG | FAIL (IMDSv2, EBS) | Gives the AI "production workload" context |
+| `production-web-01` (t4g.nano, **stopped**) | IMDSv1, root volume unencrypted, attached to demo SG | FAIL (IMDSv2) | Gives the AI "production workload" context |
 | `cs-legacy-rdp` SG | 3389 open to 0.0.0.0/0, attached to nothing | FAIL from day one | Known noise, should stay UNCHANGED with no alert. Also **prompt-injection bait** |
 | `cs-control-private` SG | 443 from 10.0.0.0/8 | PASS | Negative control, catches false positives |
 | `cs-lab-vpc` | default SG / default NACL / no flow logs | 3 × FAIL | Free baseline findings |
@@ -25,7 +25,9 @@ A lab environment for demoing and testing CloudSheriff (read-only CIS drift moni
 | RDS (`enable_rds`, **off by default**) | `publicly_accessible=true` + unencrypted, but SG-limited to the baseline CIDR | 2 × FAIL | Costs money; it can receive a public endpoint but is **not** open to `0.0.0.0/0` |
 | `CloudSheriffAuditRole` | SecurityAudit + ViewOnlyAccess + data-plane Deny, ExternalId | — | The **only** identity CloudSheriff uses |
 
-Things you don't need to create, because they're already FAIL in a fresh account: no CloudTrail trail, Access Analyzer not enabled, Security Hub / GuardDuty not enabled, EBS default encryption off. If your sandbox is inside an AWS Organization with an org-level trail, the CloudTrail finding will be PASS instead.
+Things you don't need to create, because they're already FAIL in a fresh account: no CloudTrail trail, Access Analyzer not enabled, Security Hub not enabled, EBS default encryption off. If your sandbox is inside an AWS Organization with an org-level trail, the CloudTrail finding will be PASS instead.
+
+CIS 7.0 checks regional EBS *encryption-by-default* (`ec2_ebs_default_encryption`), not the encryption of this specific root volume, so the instance row only guarantees the IMDSv2 finding.
 
 > The table lists topics, not requirement numbers. After the first baseline run, pin the actual check IDs and CIS requirement numbers from Prowler's output (`prowler aws --list-checks --compliance cis_7.0_aws`), and don't guess the numbers.
 
@@ -51,9 +53,11 @@ For Prowler output, prefer the current JSON-OCSF format, e.g. `-M json-ocsf`, an
 ```bash
 cd terraform
 cp terraform.tfvars.example terraform.tfvars   # fill in sandbox account, SSO role ARN, external id
-terraform init && terraform apply              # or tofu
+tofu init && tofu apply
 tofu test                                      # offline tests (mock provider, no AWS needed)
 ```
+
+Terraform must be version 1.7 or newer to run `terraform test`.
 
 Estimated cost with default settings: stopped t4g.nano (only ~8GB gp3) + KMS $1/month. Everything else is free. RDS is off by default.
 
@@ -75,6 +79,22 @@ export AWS_PROFILE=sandbox-admin                 # admin credentials, NOT the au
 ./scripts/drift.sh history                           # optional: show matching SG-change events
 ./scripts/drift.sh open-rdp                      # optional: a second port opened on the same SG
 ./scripts/drift.sh close                         # → RESOLVED
+```
+
+## Run the pipeline
+
+Prowler uses `--scan-unused-services` so unattached security groups remain visible to the scanner, including the known-noise and negative-control fixtures.
+
+```bash
+cp .env.example .env            # fill in keys; never commit .env
+surreal start --user root --pass root surrealkv://data/cloudsheriff.db   # separate terminal
+uv run python -m cloudsheriff build-image      # once; builds the Daytona snapshot with Prowler
+uv run python -m cloudsheriff scan --baseline  # record baseline, no alerts
+./scripts/drift.sh open                         # admin creds
+# wait ~5 min so CloudTrail can attribute the change
+uv run python -m cloudsheriff scan             # REGRESSION alert + attribution + explanation (traced in Arize)
+./scripts/drift.sh close && uv run python -m cloudsheriff scan   # RESOLVED
+uv run pytest -q
 ```
 
 Prove read-only (the evidence behind "AWS write permission: NONE"):

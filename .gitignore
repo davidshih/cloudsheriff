@@ -20,7 +20,13 @@ __pycache__/
 # Scan output
 output/
 
+# Local SurrealDB
+data/
+
 # Local status reports
 *_STATUS_UPDATE_*.html
 
 .DS_Store
+
+# Codex pipeline logs
+plans/**/*.log

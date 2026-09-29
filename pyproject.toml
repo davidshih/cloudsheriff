@@ -1,0 +1,26 @@
+[project]
+name = "cloudsheriff"
+version = "0.1.0"
+description = "Read-only CIS drift monitor: Daytona scan room + Prowler + SurrealDB + Claude + Arize"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+    "anthropic>=1.9.0",
+    "arize-otel>=0.14.1",
+    "boto3>=1.43.104",
+    "daytona>=0.218.0",
+    "openinference-instrumentation-anthropic>=2.1.6",
+    "python-dotenv>=1.2.3",
+    "surrealdb>=2.0.0",
+]
+
+[tool.uv]
+package = false
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
