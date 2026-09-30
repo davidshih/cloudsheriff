@@ -12,6 +12,7 @@ DEMO_CHECKS = [
     "ec2_securitygroup_allow_ingress_from_internet_to_tcp_port_3389",
     "ec2_securitygroup_default_restrict_traffic",
 ]
+CIS_FRAMEWORK = "CIS-7.0"
 ALERT_SEVERITIES = {"critical", "high", "medium"}
 ALERT_CHANGES = {"NEW", "REGRESSION", "CHANGED"}
 
@@ -74,8 +75,11 @@ def normalize(ocsf: list[dict]) -> list[Finding]:
         compliance = {
             key: value
             for key, value in ((item.get("unmapped") or {}).get("compliance") or {}).items()
-            if key.startswith("CIS")
+            if key == CIS_FRAMEWORK
         }
+        # Prowler puts the SG id in resources[0].name; the real name is the structured data.metadata.name.
+        metadata = (resource.get("data") or {}).get("metadata") or {}
+        name = metadata.get("name") if isinstance(metadata, dict) else None
         findings.append(
             Finding(
                 key=finding_key(account, region, check_id, uid),
@@ -84,7 +88,7 @@ def normalize(ocsf: list[dict]) -> list[Finding]:
                 severity=str(item.get("severity", "")).lower(),
                 title=(item.get("finding_info") or {}).get("title", ""),
                 resource_uid=uid,
-                resource_name=resource.get("name", ""),
+                resource_name=name or resource.get("name", ""),
                 resource_type=resource.get("type", ""),
                 region=region,
                 account=account,

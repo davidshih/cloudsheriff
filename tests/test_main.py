@@ -29,6 +29,19 @@ def test_enrich_alerts_skips_cloudtrail_for_non_sg_resource(transition, monkeypa
     assert record["attribution"] is None
 
 
+def test_attribution_window_starts_at_last_scan_end():
+    # Changes made before the previous scan are already in its baseline; an earlier
+    # window would attribute e.g. the terraform apply that created the baseline rule.
+    since = main.attribution_since({"finished_at": "2026-09-30T01:34:05Z"})
+    assert since == datetime(2026, 9, 30, 1, 34, 5, tzinfo=timezone.utc)
+
+
+def test_attribution_window_without_previous_scan_is_last_day():
+    since = main.attribution_since(None)
+    age = datetime.now(timezone.utc) - since
+    assert 23.9 < age.total_seconds() / 3600 < 24.1
+
+
 def test_enrich_alerts_success(transition, monkeypatch):
     attribution = {"actor": "actor"}
     monkeypatch.setattr(main.aws, "cloudtrail_attribution", lambda *args: attribution)

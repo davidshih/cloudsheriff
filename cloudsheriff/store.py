@@ -24,6 +24,12 @@ class Store:
         if self.url.startswith(("ws", "http")):
             self.db.signin({"username": self.user, "password": self.password})
         self.db.use(NS, DB)
+        # SurrealDB 3.x servers reject SELECT on a table that does not exist yet.
+        self.db.query(
+            "DEFINE TABLE IF NOT EXISTS finding SCHEMALESS;"
+            "DEFINE TABLE IF NOT EXISTS scan SCHEMALESS;"
+            "DEFINE TABLE IF NOT EXISTS event SCHEMALESS;"
+        )
         return self
 
     def __exit__(self, exc_type, exc_value, traceback):

@@ -26,6 +26,13 @@ def now_iso() -> str:
     return now().strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
+def attribution_since(last: dict | None) -> datetime:
+    # Changes before the previous scan finished are already part of its baseline.
+    if last:
+        return datetime.fromisoformat(last["finished_at"].replace("Z", "+00:00"))
+    return now() - timedelta(hours=24)
+
+
 def enrich_alerts(alerts, audit, region, since, tracer) -> list[dict]:
     records = []
     for transition in alerts:
@@ -90,7 +97,8 @@ def print_report(scan: dict, transitions, alert_records: list[dict]) -> None:
         print(f"explain   [{record['explanation_source']}]\n          {record['explanation']}")
     noise = [t for t in transitions if t.evaluation == "FAIL" and t.change == "UNCHANGED" and t.key not in by_key]
     if noise:
-        print(f"known noise (no alert): {len(noise)} findings, e.g. {noise[0].resource_name} …")
+        names = ", ".join(sorted({t.resource_name for t in noise}))
+        print(f"known noise (no alert): {len(noise)} findings on {names}")
 
 
 def run_scan(args) -> int:
@@ -131,11 +139,7 @@ def run_scan(args) -> int:
             previous, last = store.load_state(), store.last_scan()
             transitions, updates = engine.diff(previous, findings, scanned, now_iso())
             alerts = engine.alert_gate(transitions, args.baseline)
-            if last:
-                last_time = datetime.fromisoformat(last["finished_at"].replace("Z", "+00:00"))
-            else:
-                last_time = now() - timedelta(hours=24)
-            alert_records = enrich_alerts(alerts, audit, region, last_time - timedelta(minutes=10), tracer)
+            alert_records = enrich_alerts(alerts, audit, region, attribution_since(last), tracer)
             counts = dict(Counter(transition.change for transition in transitions))
             scan = {
                 "scan_id": scan_id,

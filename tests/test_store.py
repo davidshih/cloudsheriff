@@ -1,5 +1,9 @@
+import os
+import uuid
+
 import pytest
 
+from cloudsheriff import store as store_module
 from cloudsheriff.store import Store
 
 
@@ -43,6 +47,15 @@ def test_store_upsert_replaces_record_fully():
         store.save_scan(scan("s2", "2026-01-02T00:00:00Z"), [], {"key": update(label="two")}, [])
         record = store.load_state()["key"]
         assert record["labels"] == ["two"] and "obsolete" not in record
+
+
+@pytest.mark.skipif(not os.environ.get("SURREAL_TEST_URL"), reason="needs a SurrealDB server; embedded mem:// returns [] for missing tables")
+def test_fresh_server_database_reads_empty(monkeypatch):
+    # SurrealDB 3.x servers raise NotFoundError when selecting a table that does not exist yet.
+    monkeypatch.setattr(store_module, "DB", f"test_{uuid.uuid4().hex[:8]}")
+    with Store(os.environ["SURREAL_TEST_URL"], "root", "root") as store:
+        assert store.load_state() == {}
+        assert store.last_scan() is None
 
 
 def test_store_duplicate_scan_is_atomic():

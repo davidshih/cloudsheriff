@@ -22,8 +22,9 @@ def test_normalize_reads_structured_fields_only():
     raw = json.loads(Path("tests/fixtures/prowler_demo.ocsf.json").read_text())
     item = engine.normalize(raw)[0]
     assert item.status == "PASS" and item.severity == "high"
+    assert item.resource_name == "cs-demo-admin"  # real Prowler puts the SG id in resources[0].name
     assert item.labels == ("Name:cs-demo-admin", "Environment:production")
-    assert item.compliance == {"CIS-7.0": ["5.3"]}
+    assert item.compliance == {"CIS-7.0": ["6.3", "6.4"]}  # only the targeted benchmark
     assert "message" not in item.__dict__
 
 
