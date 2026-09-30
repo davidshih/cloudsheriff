@@ -2,7 +2,7 @@
 
 A lab environment for demoing and testing CloudSheriff (read-only CIS drift monitor).
 
-> **Scope:** this repository contains the AWS test fixture and the CloudSheriff pipeline in `cloudsheriff/`. See `HACKSPRINT_BOUNDARY.md` for what was built before and during the event.
+> **Scope:** this repository contains the AWS test fixture and the CloudSheriff pipeline in `cloudsheriff/`. See [`docs/reference/hacksprint-boundary.md`](docs/reference/hacksprint-boundary.md) for what was built before and during the event.
 **Deploy it only in a dedicated sandbox AWS account.** Two guards prevent mistakes:
 
 1. The provider sets `allowed_account_ids`, so it refuses to run against any other account.
@@ -47,6 +47,10 @@ For the demo SG, save a canonical minimal snapshot (ports, protocols, CIDRs, rul
 A targeted live re-scan must **not** mark all unscanned controls as resolved. Those controls remain `NOT_EVALUATED` for that run. Also distinguish a missing resource (`RESOURCE_GONE`) from an actual remediation.
 
 For Prowler output, prefer the current JSON-OCSF format, e.g. `-M json-ocsf`, and normalize only stable structured fields. Do not hash human-readable status text as security evidence because scanner-version wording changes can create false drift.
+
+## Quick start
+
+Deploy the AWS lab once ([Deploy](#deploy)), then record a baseline and run a drift scan ([Run the pipeline](#run-the-pipeline)).
 
 ## Deploy
 
@@ -128,6 +132,14 @@ Prove read-only (the evidence behind "AWS write permission: NONE"):
 
 ```bash
 ROLE_ARN=$(tofu -chdir=terraform output -raw audit_role_arn) ./scripts/verify_readonly.sh
+```
+
+## Verify
+
+```bash
+uv run pytest -q                  # offline unit tests (70 passed, 1 skipped on 2026-09-30)
+tofu -chdir=terraform test        # Terraform tests with a mock provider, no AWS needed (6 passed)
+ROLE_ARN=$(tofu -chdir=terraform output -raw audit_role_arn) ./scripts/verify_readonly.sh   # audit role cannot write
 ```
 
 ## Cleanup

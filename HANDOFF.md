@@ -1,8 +1,9 @@
 # HANDOFF — daytona-hackathon (CloudSheriff)
 
-Last updated: 2026-09-29 (America/New_York). Branch `main`. No git remote yet.
+Last updated: 2026-09-30 (America/New_York). Branch `main`, pushed to `origin` (public `davidshih/cloudsheriff`).
 
 ## Current state
+- Docs follow the global `repo-docs` layout since 2026-09-30: `HACKSPRINT_BOUNDARY.md` moved to `docs/reference/hacksprint-boundary.md` (pure rename, `d7e0461`); README links it and gained `## Quick start` and `## Verify`.
 - CloudSheriff runs end to end against real AWS. The flow is: read-only STS → an ephemeral Daytona sandbox that runs targeted Prowler (JSON-OCSF) → normalize → three-axis diff → SurrealDB → deterministic alert gate → CloudTrail attribution → LLM explanation traced in Arize → sandbox destroyed.
 - Live run verified on 2026-09-30 01:33–01:37Z: baseline (17 NEW) → baseline again (17 UNCHANGED) → `drift.sh open` → scan (1 REGRESSION alert on `cs-demo-admin` tcp/22, attribution to the drift event, LLM explanation) → `drift.sh close` → scan (RESOLVED, 0 alerts). One scan takes about 20–30 s. CloudTrail delivery lag measured at 1.9 min.
 - Tests: `uv run pytest -q` gives 70 passed, 1 skipped; with `SURREAL_TEST_URL=ws://127.0.0.1:8000/rpc` it gives 71 passed. `tofu -chdir=terraform test` gives 6 passed.
@@ -40,7 +41,7 @@ Last updated: 2026-09-29 (America/New_York). Branch `main`. No git remote yet.
 4. Create a public GitHub repo and push (a hackathon requirement): `gh repo create <name> --public --source . --push`.
 5. Evidence per check instead of per SG, so `drift.sh open-rdp` does not re-alert the already-failing port-22 finding as CHANGED.
 6. Attribute `ModifySecurityGroupRules` (its requestParameters carry no top-level `groupId`).
-7. Rehearse and record a backup video. On the event day, build the declared new feature: agentic investigation and remediation proposals (see `HACKSPRINT_BOUNDARY.md`).
+7. Rehearse and record a backup video. On the event day, build the declared new feature: agentic investigation and remediation proposals (see `docs/reference/hacksprint-boundary.md`).
 
 ## Demo runbook (live)
 ```bash
