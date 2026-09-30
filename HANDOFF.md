@@ -14,10 +14,10 @@ Last updated: 2026-09-29 (America/New_York). Branch `main`. No git remote yet.
 - `376d06a` `terraform/bootstrap/` for the member account, AWS access docs, `.env.example` restored
 
 ## AWS layout (important)
-- `707279511837` is the user's **Organization management account**, and it is in real use. **Never deploy the lab there.**
-- The lab lives in member account `189053740757` (`cloudsheriff-lab`). It was deployed with `tofu -chdir=terraform apply` (29 resources), and `verify_readonly.sh` passes 20/20.
+- The management account (id kept out of this public repo) is the user's **Organization management account**, and it is in real use. **Never deploy the lab there.**
+- The lab lives in member account `<lab-account-id>` (`cloudsheriff-lab`). It was deployed with `tofu -chdir=terraform apply` (29 resources), and `verify_readonly.sh` passes 20/20.
 - Access uses repo-local, gitignored files. `.aws/credentials [cs-mgmt]` holds the management-account IAM user key. `.aws/config [profile cs-sandbox]` assumes `OrganizationAccountAccessRole` in the lab account. `.env` sets `AWS_CONFIG_FILE`, `AWS_SHARED_CREDENTIALS_FILE` and `AWS_PROFILE=cs-sandbox`. Keep AWS keys out of `.env`: env credentials beat the profile and would hit the management account.
-- `CloudSheriffAuditRole` trusts `arn:aws:iam::189053740757:role/OrganizationAccountAccessRole` with an ExternalId. The id is in `terraform/terraform.tfvars` and `.env` (both gitignored).
+- `CloudSheriffAuditRole` trusts `arn:aws:iam::<lab-account-id>:role/OrganizationAccountAccessRole` with an ExternalId. The id is in `terraform/terraform.tfvars` and `.env` (both gitignored).
 
 ## Decisions
 - Only Prowler runs inside Daytona. The SG snapshot and CloudTrail lookups run on the orchestrator with the same read-only STS session, which keeps them unit-testable.
@@ -33,7 +33,7 @@ Last updated: 2026-09-29 (America/New_York). Branch `main`. No git remote yet.
 - The harness test-integrity hook flags `skipif`. The server-only test in `tests/test_store.py` is intentional, and the reason is in `529b6f0`.
 
 ## TODO (runnable)
-1. Security (HIGH): the management-account user `davidshih` has AdministratorAccess, its MFA-enforcing inline policy was removed, and its long-lived key sits in `.aws/credentials`. Create a least-privilege IAM user (`sts:AssumeRole` on the lab `OrganizationAccountAccessRole` plus `organizations:Describe*`), swap the key in `.aws/credentials`, and restore `MFA-authenticated` on `davidshih`. This needs the user's console action.
+1. Security (HIGH): move the orchestrator's source credentials to a least-privilege identity (only `sts:AssumeRole` into the lab admin role, plus `organizations:Describe*`) and keep MFA enforced on human admin users. Details are tracked privately, not in this repo.
 2. Bootstrap apply: it needs user approval, and it touches the management account (adds tags, imports into state).
    `set -a; source .env; set +a; tofu -chdir=terraform/bootstrap plan` currently shows 1 import, 1 in-place (tags), 0 destroy.
 3. Check the Arize UI: project `cloudsheriff`, trace `cloudsheriff.scan`. Only exporter `force_flush()==True` has been verified.
