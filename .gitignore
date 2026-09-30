@@ -30,3 +30,7 @@ data/
 
 # Codex pipeline logs
 plans/**/*.log
+
+# Repo-local AWS profile (contains keys)
+.aws/
+.env.bak-*

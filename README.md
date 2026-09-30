@@ -81,6 +81,33 @@ export AWS_PROFILE=sandbox-admin                 # admin credentials, NOT the au
 ./scripts/drift.sh close                         # → RESOLVED
 ```
 
+## AWS access (dedicated member account)
+
+The lab runs in its own AWS Organizations member account, never in the management account. All tools (aws CLI, OpenTofu, boto3) use a repo-local profile, selected by `AWS_CONFIG_FILE`, `AWS_SHARED_CREDENTIALS_FILE` and `AWS_PROFILE=cs-sandbox` in `.env`. The gitignored `.aws/` directory holds:
+
+```ini
+# .aws/credentials: management-account IAM user key
+[cs-mgmt]
+aws_access_key_id = ...
+aws_secret_access_key = ...
+
+# .aws/config: admin in the lab account via the role Organizations creates
+[profile cs-mgmt]
+region = us-east-1
+[profile cs-sandbox]
+role_arn = arn:aws:iam::<lab-account-id>:role/OrganizationAccountAccessRole
+source_profile = cs-mgmt
+region = us-east-1
+```
+
+Do not put AWS keys in `.env`. Environment-variable credentials take precedence over the profile and would point every tool at the management account.
+
+`terraform/bootstrap/` manages the member account itself from the management account (`profile = "cs-mgmt"`). Set `lab_account_id` to adopt an existing account through an `import` block, or leave it null to create one. `prevent_destroy` guards against closing the account by accident.
+
+```bash
+tofu -chdir=terraform/bootstrap init && tofu -chdir=terraform/bootstrap plan
+```
+
 ## Run the pipeline
 
 Prowler uses `--scan-unused-services` so unattached security groups remain visible to the scanner, including the known-noise and negative-control fixtures.
@@ -91,7 +118,7 @@ surreal start --user root --pass root surrealkv://data/cloudsheriff.db   # separ
 uv run python -m cloudsheriff build-image      # once; builds the Daytona snapshot with Prowler
 uv run python -m cloudsheriff scan --baseline  # record baseline, no alerts
 ./scripts/drift.sh open                         # admin creds
-# wait ~5 min so CloudTrail can attribute the change
+# wait for CloudTrail delivery (measured ~2 min on 2026-09-30); until then attribution shows "pending"
 uv run python -m cloudsheriff scan             # REGRESSION alert + attribution + explanation (traced in Arize)
 ./scripts/drift.sh close && uv run python -m cloudsheriff scan   # RESOLVED
 uv run pytest -q
@@ -100,7 +127,7 @@ uv run pytest -q
 Prove read-only (the evidence behind "AWS write permission: NONE"):
 
 ```bash
-ROLE_ARN=$(terraform output -raw audit_role_arn) ./scripts/verify_readonly.sh
+ROLE_ARN=$(tofu -chdir=terraform output -raw audit_role_arn) ./scripts/verify_readonly.sh
 ```
 
 ## Cleanup
